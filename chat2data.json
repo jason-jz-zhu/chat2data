@@ -1,0 +1,22 @@
+{
+  "llm": {
+    "provider": "mock",
+    "model_name": "llama3:latest",
+    "base_url": "http://localhost:11434",
+    "api_key": null
+  },
+  "database": {
+    "provider": "sqlite",
+    "path": "./data/chat2data.db",
+    "connection_string": null
+  },
+  "vector_store": {
+    "provider": "memory",
+    "path": null
+  },
+  "server": {
+    "host": "localhost",
+    "port": 5000,
+    "debug": false
+  }
+}

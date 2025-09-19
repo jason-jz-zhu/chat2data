@@ -1,3 +1,62 @@
+Metadata-Version: 2.4
+Name: chat2data
+Version: 0.1.0
+Summary: Natural Language to SQL Framework using local LLMs and vector databases
+Author-email: Chat2Data Team <team@chat2data.com>
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/chat2data/chat2data
+Project-URL: Bug Reports, https://github.com/chat2data/chat2data/issues
+Project-URL: Source, https://github.com/chat2data/chat2data
+Keywords: sql,nlp,llm,database,natural-language
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Database
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: click>=8.0.0
+Requires-Dist: pydantic>=2.10
+Requires-Dist: requests>=2.31.0
+Provides-Extra: ollama
+Requires-Dist: pydantic-ai>=0.0.15; extra == "ollama"
+Requires-Dist: ollama>=0.1.7; extra == "ollama"
+Provides-Extra: server
+Requires-Dist: flask>=3.0.0; extra == "server"
+Requires-Dist: flask-cors>=4.0.0; extra == "server"
+Provides-Extra: frontend
+Requires-Dist: streamlit>=1.29.0; extra == "frontend"
+Requires-Dist: plotly>=5.18.0; extra == "frontend"
+Requires-Dist: pandas>=2.1.4; extra == "frontend"
+Provides-Extra: vector
+Requires-Dist: chromadb>=0.4.22; extra == "vector"
+Requires-Dist: numpy>=1.26.2; extra == "vector"
+Provides-Extra: postgres
+Requires-Dist: psycopg2-binary>=2.9.9; extra == "postgres"
+Provides-Extra: mysql
+Requires-Dist: PyMySQL>=1.0.0; extra == "mysql"
+Provides-Extra: all
+Requires-Dist: pydantic-ai>=0.0.15; extra == "all"
+Requires-Dist: ollama>=0.1.7; extra == "all"
+Requires-Dist: flask>=3.0.0; extra == "all"
+Requires-Dist: flask-cors>=4.0.0; extra == "all"
+Requires-Dist: streamlit>=1.29.0; extra == "all"
+Requires-Dist: plotly>=5.18.0; extra == "all"
+Requires-Dist: pandas>=2.1.4; extra == "all"
+Requires-Dist: chromadb>=0.4.22; extra == "all"
+Requires-Dist: numpy>=1.26.2; extra == "all"
+Requires-Dist: psycopg2-binary>=2.9.9; extra == "all"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.3; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.1; extra == "dev"
+Requires-Dist: black>=23.12.0; extra == "dev"
+Requires-Dist: ruff>=0.1.8; extra == "dev"
+Requires-Dist: mypy>=1.7.1; extra == "dev"
+
 # Chat2Data
 
 A Python framework for converting natural language queries into SQL using Large Language Models (LLMs).

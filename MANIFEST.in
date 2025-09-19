@@ -1,0 +1,10 @@
+include README.md
+include LICENSE
+include PACKAGE_GUIDE.md
+include pyproject.toml
+recursive-include chat2data *.py
+recursive-include chat2data/data *
+recursive-include chat2data/templates *
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .git*
