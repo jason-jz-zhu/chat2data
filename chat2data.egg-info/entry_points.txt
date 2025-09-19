@@ -1,2 +1,0 @@
-[console_scripts]
-chat2data = chat2data.cli.main:cli
