@@ -207,14 +207,31 @@ class SQLiteDatabaseProvider(DatabaseProvider):
                 cursor.execute(f"PRAGMA table_info({table_name})")
                 columns_info = cursor.fetchall()
 
+                # Get foreign key information
+                cursor.execute(f"PRAGMA foreign_key_list({table_name})")
+                fk_info = cursor.fetchall()
+
+                # Create a mapping of column names to foreign key info
+                fk_map = {}
+                for fk in fk_info:
+                    # fk format: [id, seq, table, from_col, to_col, on_update, on_delete, match]
+                    fk_map[fk[3]] = {'table': fk[2], 'column': fk[4]}
+
                 columns = []
                 for col_info in columns_info:
-                    columns.append({
-                        'name': col_info[1],
+                    col_name = col_info[1]
+                    column_data = {
+                        'name': col_name,
                         'type': col_info[2],
                         'nullable': not col_info[3],
                         'primary_key': bool(col_info[5])
-                    })
+                    }
+
+                    # Add foreign key information if available
+                    if col_name in fk_map:
+                        column_data['foreign_key'] = f"{fk_map[col_name]['table']}.{fk_map[col_name]['column']}"
+
+                    columns.append(column_data)
 
                 # Get row count
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
@@ -234,10 +251,13 @@ class SQLiteDatabaseProvider(DatabaseProvider):
             return []
 
     def validate_sql(self, sql: str) -> Tuple[bool, str]:
-        """Validate SQL for safety"""
-        sql_upper = sql.upper().strip()
+        """Validate SQL for safety and syntax"""
+        import re
 
-        # Check for dangerous operations
+        sql_stripped = sql.strip()
+        sql_upper = sql_stripped.upper()
+
+        # Check for dangerous operations using word boundaries
         dangerous_keywords = [
             'DROP', 'DELETE', 'INSERT', 'UPDATE', 'ALTER', 'CREATE',
             'TRUNCATE', 'REPLACE', 'PRAGMA', 'ATTACH', 'DETACH'
@@ -249,8 +269,9 @@ class SQLiteDatabaseProvider(DatabaseProvider):
             ';',      # Prevent multiple statements
         ]
 
+        # Use word boundaries to match whole words only
         for keyword in dangerous_keywords:
-            if keyword in sql_upper:
+            if re.search(r'\b' + keyword + r'\b', sql_upper):
                 return False, f"Forbidden SQL operation: {keyword}"
 
         for pattern in dangerous_patterns:
@@ -261,11 +282,138 @@ class SQLiteDatabaseProvider(DatabaseProvider):
         if not sql_upper.startswith('SELECT'):
             return False, "Only SELECT queries are allowed"
 
-        # Basic syntax validation
+        # Enhanced syntax validation
+        validation_result = self._validate_sql_syntax(sql_stripped)
+        if not validation_result[0]:
+            return validation_result
+
+        # Table and column validation
+        table_validation = self._validate_table_references(sql_stripped)
+        if not table_validation[0]:
+            return table_validation
+
+        return True, "Valid SQL"
+
+    def _validate_sql_syntax(self, sql: str) -> Tuple[bool, str]:
+        """Enhanced SQL syntax validation"""
+        # Basic parentheses matching
         if sql.count('(') != sql.count(')'):
             return False, "Mismatched parentheses"
 
-        return True, "Valid SQL"
+        # Check for incomplete queries
+        if sql.strip().endswith(','):
+            return False, "Query appears incomplete (ends with comma)"
+
+        # Check for common syntax errors
+        sql_upper = sql.upper()
+
+        # Check for orphaned table aliases
+        import re
+
+        # Look for table references like "p.column" without proper JOIN
+        alias_refs = re.findall(r'\b(\w+)\.(\w+)', sql)
+        if alias_refs:
+            # Check if aliases are defined in FROM or JOIN clauses
+            from_match = re.search(r'FROM\s+(\w+)(?:\s+AS\s+(\w+)|\s+(\w+))?', sql_upper)
+            join_matches = re.findall(r'JOIN\s+(\w+)(?:\s+AS\s+(\w+)|\s+(\w+))?', sql_upper)
+
+            defined_aliases = set()
+            if from_match:
+                table_name, as_alias, direct_alias = from_match.groups()
+                if as_alias:
+                    defined_aliases.add(as_alias.lower())
+                elif direct_alias:
+                    defined_aliases.add(direct_alias.lower())
+                else:
+                    defined_aliases.add(table_name.lower())
+
+            for join_match in join_matches:
+                table_name, as_alias, direct_alias = join_match
+                if as_alias:
+                    defined_aliases.add(as_alias.lower())
+                elif direct_alias:
+                    defined_aliases.add(direct_alias.lower())
+                else:
+                    defined_aliases.add(table_name.lower())
+
+            # Check if used aliases are defined
+            for alias, column in alias_refs:
+                if alias.lower() not in defined_aliases:
+                    return False, f"Undefined table alias '{alias}' used in '{alias}.{column}'"
+
+        # Check for malformed WHERE clauses
+        if 'WHERE' in sql_upper:
+            where_part = sql_upper.split('WHERE')[1].split('GROUP BY')[0].split('ORDER BY')[0].split('LIMIT')[0]
+            if 'IN (' in where_part and ')' not in where_part:
+                return False, "Malformed WHERE clause with incomplete IN condition"
+
+        return True, "Syntax validation passed"
+
+    def _validate_table_references(self, sql: str) -> Tuple[bool, str]:
+        """Validate that referenced tables exist in the database"""
+        try:
+            # Get available tables
+            schema_info = self.get_schema()
+            available_tables = {table.name.lower() for table in schema_info}
+
+            # Extract table references from SQL
+            import re
+            sql_upper = sql.upper()
+
+            # Find FROM clauses
+            from_matches = re.findall(r'FROM\s+(\w+)', sql_upper)
+            # Find JOIN clauses
+            join_matches = re.findall(r'JOIN\s+(\w+)', sql_upper)
+
+            referenced_tables = set()
+            referenced_tables.update(table.lower() for table in from_matches)
+            referenced_tables.update(table.lower() for table in join_matches)
+
+            # Check if all referenced tables exist
+            missing_tables = referenced_tables - available_tables
+            if missing_tables:
+                return False, f"Referenced table(s) do not exist: {', '.join(missing_tables)}"
+
+            return True, "Table references validated"
+
+        except Exception as e:
+            # If validation fails, allow the query to proceed (non-critical validation)
+            logger.warning(f"Table reference validation failed: {e}")
+            return True, "Table validation skipped due to error"
+
+    def get_table_relationships(self) -> List[Dict[str, Any]]:
+        """Get table relationships based on foreign keys"""
+        try:
+            conn = sqlite3.connect(self.database_path)
+            cursor = conn.cursor()
+
+            # Get all tables
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = cursor.fetchall()
+
+            relationships = []
+            for (table_name,) in tables:
+                # Get foreign key information for this table
+                cursor.execute(f"PRAGMA foreign_key_list({table_name})")
+                fk_info = cursor.fetchall()
+
+                for fk in fk_info:
+                    # fk format: [id, seq, table, from_col, to_col, on_update, on_delete, match]
+                    relationship = {
+                        'from_table': table_name,
+                        'from_column': fk[3],
+                        'to_table': fk[2],
+                        'to_column': fk[4],
+                        'relationship_type': 'foreign_key'
+                    }
+                    relationships.append(relationship)
+
+            conn.close()
+            return relationships
+
+        except Exception as e:
+            logger.error(f"Error getting table relationships: {e}")
+            return []
 
     def is_connected(self) -> bool:
         """Check if database is connected"""

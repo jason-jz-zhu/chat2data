@@ -85,8 +85,21 @@ class Chat2Data:
                     summary = await self.llm.generate_summary(
                         result.data, natural_language_query
                     )
+
+                    # Validate summary doesn't contain SQL
+                    if summary and any(keyword in summary.upper() for keyword in ['SELECT ', 'FROM ', 'WHERE ', 'JOIN ', 'LIMIT ']):
+                        logger.warning(f"Summary contained SQL keywords, replacing with fallback")
+                        summary = f"Found {len(result.data)} results for your query."
+
+                    # Additional check for summaries that ARE SQL queries
+                    if summary and summary.strip().upper().startswith(('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH')):
+                        logger.warning(f"Summary was a SQL query, replacing with fallback")
+                        summary = f"Found {len(result.data)} results for your query."
+
                 except Exception as e:
                     logger.warning(f"Failed to generate summary: {e}")
+                    # Provide a fallback summary
+                    summary = f"Found {len(result.data)} results for your query."
 
             return {
                 "success": result.success,

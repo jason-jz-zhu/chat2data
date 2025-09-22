@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 class LLMConfig(BaseModel):
     """LLM provider configuration"""
-    provider: str = Field(default="mock", description="LLM provider (mock, ollama)")
-    model_name: str = Field(default="llama3:latest", description="Model name for LLM")
+    provider: str = Field(default="ollama", description="LLM provider (mock, ollama)")
+    model_name: str = Field(default="llama3.2:latest", description="Model name for LLM")
     base_url: str = Field(default="http://localhost:11434", description="Base URL for LLM service")
     api_key: Optional[str] = Field(default=None, description="API key if required")
 
@@ -175,11 +175,11 @@ class Config(BaseModel):
                 import requests
                 response = requests.get(f"{config.llm.base_url}/api/tags", timeout=5)
                 if response.status_code != 200:
-                    logger.warning("Ollama not available, falling back to mock provider")
-                    config.llm.provider = "mock"
-            except Exception:
-                logger.warning("Ollama not available, falling back to mock provider")
-                config.llm.provider = "mock"
+                    logger.warning("Ollama not available at %s. Please ensure Ollama is running.", config.llm.base_url)
+                    # Still keep ollama as default, just warn the user
+            except Exception as e:
+                logger.warning("Ollama not available at %s: %s. Please ensure Ollama is running.", config.llm.base_url, str(e))
+                # Still keep ollama as default, just warn the user
 
         # Ensure database directory exists
         if config.database.provider == "sqlite":

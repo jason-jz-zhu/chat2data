@@ -1,0 +1,178 @@
+# Summary Generation Template Prompts
+# Templates for generating natural language summaries of query results
+
+basic:
+  template: |
+    Summarize the results of this SQL query in plain English.
+
+    Query executed: $query
+    Number of results: $row_count
+
+    Provide a brief, clear summary for a non-technical user.
+
+detailed:
+  template: |
+    Provide a comprehensive summary of the query results.
+
+    Query: $query
+    Total records: $row_count
+
+    Data preview (first $sample_size records):
+    $sample_data
+
+    Include:
+    - What data was retrieved
+    - Key insights or patterns
+    - Any notable findings
+
+    Keep the summary under 3 paragraphs.
+
+statistical:
+  template: |
+    Generate a statistical summary of the results.
+
+    Query: $query
+    Total records: $row_count
+
+    Column statistics:
+    $column_stats
+
+    Provide:
+    - Count and distribution information
+    - Average/median/mode where applicable
+    - Range and outliers if present
+    - Trends or patterns
+
+count_focused:
+  template: |
+    Query: $query
+
+    CRITICAL: There are exactly $row_count total records in the results.
+
+    Sample of data (showing $sample_size of $row_count):
+    $sample_data
+
+    Your summary MUST state the correct total count of $row_count records.
+    Do not confuse the sample size with the total count.
+
+    Summary:
+
+insights:
+  template: |
+    Analyze these query results for business insights.
+
+    Query context: $query
+    Records found: $row_count
+
+    Data sample:
+    $sample_data
+
+    Provide:
+    1. What the data shows
+    2. Business implications
+    3. Potential actions or recommendations
+
+    Focus on actionable insights.
+
+comparison:
+  template: |
+    Compare and contrast the results.
+
+    Query: $query
+    Total items: $row_count
+
+    Data groups:
+    $grouped_data
+
+    Highlight:
+    - Similarities between groups
+    - Key differences
+    - Relative proportions
+    - Standout items
+
+trend_analysis:
+  template: |
+    Analyze temporal trends in the data.
+
+    Query: $query
+    Time period covered: $time_range
+    Total records: $row_count
+
+    Time-series data:
+    $temporal_data
+
+    Identify:
+    - Overall trend (increasing/decreasing/stable)
+    - Seasonal patterns
+    - Anomalies or spikes
+    - Rate of change
+
+executive_summary:
+  template: |
+    Create an executive summary of the results.
+
+    Query purpose: $query
+    Dataset size: $row_count records
+
+    Key findings:
+    $key_data
+
+    Write a concise summary suitable for senior management.
+    Focus on:
+    - Bottom-line impact
+    - Critical numbers
+    - Action items
+
+    Maximum 2 sentences.
+
+technical_summary:
+  template: |
+    Generate a technical summary of the query results.
+
+    SQL Query: $query
+    Execution time: $execution_time ms
+    Rows returned: $row_count
+
+    Schema used:
+    $schema_info
+
+    Result structure:
+    $result_structure
+
+    Include technical details about the query execution and data structure.
+
+# Special case templates
+empty_results:
+  template: |
+    Query: $query
+
+    No results were found matching your criteria.
+    This could mean:
+    - No data exists for the specified conditions
+    - The filters are too restrictive
+    - The requested data hasn't been recorded yet
+
+    Suggestion: Try broadening your search criteria.
+
+error_summary:
+  template: |
+    The query encountered an issue:
+
+    Original request: $query
+    Issue: $error_type
+
+    $error_suggestion
+
+    Please try rephrasing your question or contact support if the issue persists.
+
+partial_results:
+  template: |
+    Query: $query
+
+    Showing partial results: $row_count of approximately $estimated_total records
+    (Results limited for performance)
+
+    Based on the available data:
+    $sample_summary
+
+    For complete results, consider adding more specific filters.

@@ -60,6 +60,9 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+test_*.py
+*_test.py
+debug_*.py
 
 # Streamlit
 .streamlit/
@@ -77,4 +80,14 @@ models/
 
 # Cache
 .cache/
+cache/
 *.pyc
+
+# Vector store
+vector_store/
+
+# UV lock file
+uv.lock
+
+# Temporary documentation files
+DUPLICATE_WIDGET_FIX_SUMMARY.md

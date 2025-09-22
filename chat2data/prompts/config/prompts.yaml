@@ -1,0 +1,199 @@
+# Central Prompt Configuration for Chat2Data
+# This file contains all prompts used across the system
+
+prompts:
+  # SQL Generation Prompts
+  sql_generation:
+    base:
+      template: |
+        You are an expert SQL query generator. Your task is to convert natural language questions into valid SQL queries.
+
+        Rules:
+        1. Generate only SELECT queries (no INSERT, UPDATE, DELETE, DROP, etc.)
+        2. Use proper SQL syntax
+        3. Be precise and accurate based on the provided schema
+        4. If the query is ambiguous, make reasonable assumptions
+        5. Always use table and column names exactly as provided in the schema
+        6. Return ONLY the SQL query, no explanations or markdown
+      safety_rules:
+        - "Only generate SELECT statements"
+        - "Never generate DDL operations (CREATE, DROP, ALTER)"
+        - "Never generate DML operations (INSERT, UPDATE, DELETE)"
+        - "Use proper escaping for special characters"
+        - "Validate table and column names against schema"
+
+    enhanced:
+      template: |
+        You are an advanced SQL query generator specialized in complex database operations.
+        You excel at understanding relationships between tables and generating optimized queries.
+
+        ## Core Responsibilities:
+        - Generate accurate SQL queries from natural language
+        - Identify and use appropriate JOINs automatically
+        - Apply correct aggregations and groupings
+        - Handle temporal queries intelligently
+
+        ## Strict Rules:
+        1. ONLY generate SELECT queries - no modifications allowed
+        2. Return ONLY the SQL query without any explanation or markdown
+        3. Use exact table and column names from the schema
+        4. Prefer explicit JOINs over implicit joins
+        5. Use appropriate aggregate functions when needed
+        6. Add ORDER BY for better result presentation when relevant
+        7. NEVER add LIMIT when user asks for "all" items ("show all", "list all", "display all")
+        8. ONLY use LIMIT when user specifically requests limited results (e.g., "top 5", "first 10")
+
+    ollama:
+      template: |
+        You are an expert SQL query generator for the Ollama provider.
+        Convert the natural language question into a valid SQL query.
+        Use only the tables and columns provided in the schema context.
+
+        IMPORTANT RULES FOR "ALL" QUERIES:
+        - When the user asks for "all" items (e.g., "show all", "list all", "display all"), do NOT add LIMIT
+        - Only use LIMIT when the user specifically asks for a limited number (e.g., "top 5", "first 10")
+        - "Show all categories" means SELECT * FROM categories (NO LIMIT)
+        - "Show top 5 categories" means SELECT * FROM categories LIMIT 5
+
+        Return only the SQL query without explanation.
+
+    enhanced_with_context:
+      template: |
+        $base_prompt
+
+        ## DATABASE STRUCTURE:
+        $database_structure
+
+        ## TABLE RELATIONSHIPS:
+        $table_relationships
+
+        ## COMMON QUERY PATTERNS:
+        $query_patterns
+
+        ## RELEVANT CONTEXT:
+        $relevant_tables
+
+        ## USER QUESTION:
+        $question
+
+        Generate the SQL query:
+
+  # Summary Generation Prompts
+  summary_generation:
+    base:
+      template: |
+        Based on this query: "$query"
+
+        TOTAL RESULTS: $row_count records
+        $sample_description
+
+        Provide a brief, natural language summary of the results.
+        Be concise and informative.
+
+    enhanced:
+      template: |
+        Query: "$query"
+
+        TOTAL RESULTS: $row_count records
+        $sample_description
+
+        CRITICAL INSTRUCTIONS:
+        - Base your summary on the TOTAL RESULTS COUNT ($row_count records), not just the preview
+        - Your summary MUST accurately reflect that there are $row_count total records
+        - If describing entities (customers, products, etc.), state the total count ($row_count)
+        - Focus on insights and patterns in the data
+        - Keep the summary concise (2-3 sentences)
+
+        Generate a natural language summary:
+
+    with_validation:
+      template: |
+        Summarize these query results accurately.
+
+        Query executed: "$query"
+        Total records found: $row_count
+
+        Data preview (first $sample_size of $row_count records):
+        $sample_data
+
+        IMPORTANT: Your summary must accurately state there are $row_count total records, not $sample_size.
+
+        Summary:
+
+  # Error Correction Prompts
+  error_correction:
+    sql_syntax:
+      template: |
+        The following SQL query has an error:
+
+        Query: $failed_query
+        Error: $error_message
+        Schema: $schema_context
+
+        Fix the query and return only the corrected SQL:
+
+    retry_with_fallback:
+      template: |
+        Previous query attempt failed. Generate a simpler alternative query.
+
+        Original question: $question
+        Failed query: $failed_query
+        Available tables: $tables
+
+        Generate a working SQL query that answers the question:
+
+  # Domain Adaptation Prompts
+  domain_adaptation:
+    schema_analysis:
+      template: |
+        Analyze this database schema for domain-specific patterns:
+
+        Tables: $tables
+        Relationships: $relationships
+
+        Identify:
+        1. The domain/industry this database serves
+        2. Common query patterns for this domain
+        3. Important business entities and their relationships
+
+    pattern_generation:
+      template: |
+        Based on this $domain database schema, generate example queries.
+
+        Schema: $schema
+        Domain characteristics: $characteristics
+
+        Provide 5 diverse example queries that would be common in this domain:
+
+  # Validation Prompts
+  validation:
+    query_safety:
+      template: |
+        Validate this SQL query for safety and correctness:
+
+        Query: $query
+        Schema: $schema
+
+        Check for:
+        1. SQL injection risks
+        2. Performance concerns
+        3. Logical errors
+        4. Schema compliance
+
+    result_verification:
+      template: |
+        Verify if this summary accurately represents the data:
+
+        Summary: $summary
+        Actual row count: $row_count
+        Sample data: $sample_data
+
+        Is the summary accurate? If not, provide corrections:
+
+# Prompt Metadata
+metadata:
+  version: "1.0.0"
+  last_updated: "2024-01-20"
+  authors:
+    - "Chat2Data Team"
+  description: "Centralized prompt configuration for Chat2Data system"

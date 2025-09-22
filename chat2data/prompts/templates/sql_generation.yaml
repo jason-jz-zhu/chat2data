@@ -1,0 +1,149 @@
+# SQL Generation Template Prompts
+# Organized by complexity and pattern type
+
+basic_select:
+  template: |
+    Generate a SQL SELECT query for: $question
+    Using schema: $schema
+    Return only the SQL query.
+
+complex_join:
+  template: |
+    Generate a SQL query with appropriate JOINs.
+    Question: $question
+
+    Available tables and relationships:
+    $table_relationships
+
+    Return only the optimized SQL query with necessary JOINs.
+
+aggregation:
+  template: |
+    Generate a SQL query with aggregation functions.
+    Question: $question
+
+    Consider using: SUM, AVG, COUNT, MIN, MAX, GROUP BY
+    Schema: $schema
+
+    Return only the SQL query.
+
+temporal:
+  template: |
+    Generate a time-based SQL query.
+    Question: $question
+
+    Date/time columns available: $temporal_columns
+    Use appropriate date functions for the database type.
+
+    Return only the SQL query.
+
+top_n:
+  template: |
+    Generate a SQL query to find top/bottom N records.
+    Question: $question
+
+    Use LIMIT and ORDER BY appropriately.
+    Schema: $schema
+
+    Return only the SQL query.
+
+subquery:
+  template: |
+    Generate a SQL query that may require subqueries.
+    Question: $question
+
+    Consider using:
+    - Correlated/uncorrelated subqueries
+    - EXISTS/NOT EXISTS
+    - IN/NOT IN with subqueries
+
+    Schema: $schema
+
+    Return only the SQL query.
+
+window_function:
+  template: |
+    Generate a SQL query using window functions if beneficial.
+    Question: $question
+
+    Available window functions:
+    - ROW_NUMBER(), RANK(), DENSE_RANK()
+    - LAG(), LEAD()
+    - SUM() OVER, AVG() OVER
+
+    Schema: $schema
+
+    Return only the SQL query.
+
+pattern_matching:
+  template: |
+    Generate a SQL query for pattern/text matching.
+    Question: $question
+
+    Use appropriate operators:
+    - LIKE, NOT LIKE
+    - REGEXP (if supported)
+    - LOWER/UPPER for case-insensitive matching
+
+    Schema: $schema
+
+    Return only the SQL query.
+
+conditional:
+  template: |
+    Generate a SQL query with conditional logic.
+    Question: $question
+
+    Consider using:
+    - CASE WHEN statements
+    - IF/IIF functions
+    - COALESCE/NULLIF
+
+    Schema: $schema
+
+    Return only the SQL query.
+
+# Provider-specific templates
+providers:
+  sqlite:
+    template: |
+      Generate a SQLite-compatible query.
+      Question: $question
+
+      SQLite specific considerations:
+      - Use strftime() for date operations
+      - No RIGHT JOIN support (use LEFT JOIN instead)
+      - LIMIT syntax without OFFSET
+
+      Schema: $schema
+
+      Return only the SQL query.
+
+  postgresql:
+    template: |
+      Generate a PostgreSQL-compatible query.
+      Question: $question
+
+      PostgreSQL features available:
+      - Advanced window functions
+      - CTEs (WITH clause)
+      - Array operations
+      - JSON operations
+
+      Schema: $schema
+
+      Return only the SQL query.
+
+  mysql:
+    template: |
+      Generate a MySQL-compatible query.
+      Question: $question
+
+      MySQL specific considerations:
+      - Use DATE_FORMAT() for date formatting
+      - LIMIT with OFFSET syntax
+      - Group by requirements
+
+      Schema: $schema
+
+      Return only the SQL query.

@@ -11,11 +11,13 @@ __email__ = "team@chat2data.com"
 __description__ = "Natural Language to SQL Framework using local LLMs and vector databases"
 
 from .core.chat2data import Chat2Data
+from .core.enhanced_chat2data import EnhancedChat2Data
 from .core.base import LLMProvider, DatabaseProvider, VectorStoreProvider
 from .config.settings import Config
 
 __all__ = [
     "Chat2Data",
+    "EnhancedChat2Data",
     "LLMProvider",
     "DatabaseProvider",
     "VectorStoreProvider",

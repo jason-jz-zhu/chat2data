@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from ..config.settings import Config
+from ..config.central_config import get_config
 from ..core.chat2data import Chat2Data
 from ..providers.llm.mock_provider import MockLLMProvider
 from ..providers.llm.ollama_provider import OllamaLLMProvider
@@ -74,12 +75,12 @@ def cli(ctx, config: Optional[str], verbose: bool):
 
 
 @cli.command()
-@click.option('--provider', default='mock', type=click.Choice(['mock', 'ollama']),
+@click.option('--provider', default=None, type=click.Choice(['mock', 'ollama']),
               help='LLM provider to use')
-@click.option('--database', default='./data/chat2data.db', help='Database path')
+@click.option('--database', default=None, help='Database path')
 @click.option('--force', is_flag=True, help='Overwrite existing configuration')
 @click.pass_context
-def init(ctx, provider: str, database: str, force: bool):
+def init(ctx, provider: Optional[str], database: Optional[str], force: bool):
     """Initialize Chat2Data configuration"""
     config_file = "chat2data.json"
 
@@ -87,13 +88,16 @@ def init(ctx, provider: str, database: str, force: bool):
         click.echo(f"Configuration file {config_file} already exists. Use --force to overwrite.")
         return
 
+    # Get central configuration defaults
+    central_config = get_config()
+
     # Create configuration
     config = Config()
-    config.llm.provider = provider
-    config.database.path = database
+    config.llm.provider = provider or central_config.llm.provider
+    config.database.path = database or central_config.database.path
 
     # Create database directory
-    Path(database).parent.mkdir(parents=True, exist_ok=True)
+    Path(config.database.path).parent.mkdir(parents=True, exist_ok=True)
 
     # Save configuration
     if config.save_to_file(config_file):
@@ -166,9 +170,10 @@ def demo(ctx, query: Optional[str], interactive: bool):
     """Run Chat2Data in demo mode with sample data"""
     config = ctx.obj
 
-    # Force demo configuration
+    # Force demo configuration using central config defaults
+    central_config = get_config()
     config.llm.provider = "mock"
-    config.database.path = "./demo_data.db"  # Use persistent file for demo
+    config.database.path = central_config.database.demo_path
 
     try:
         chat2data = create_chat2data_instance(config)
@@ -190,14 +195,38 @@ def demo(ctx, query: Optional[str], interactive: bool):
             # Interactive mode
             asyncio.run(interactive_demo(chat2data))
         else:
-            # Example queries
-            example_queries = [
-                "Show me all products",
-                "What is the total sales amount?",
-                "List top 5 most expensive products",
-                "Show sales by category",
-                "What products are low in stock?"
-            ]
+            # Generate dynamic example queries based on schema
+            try:
+                schema = chat2data.get_schema()
+                if schema and len(schema) > 0:
+                    table_names = [table.name for table in schema]
+                    primary_table = table_names[0]
+
+                    example_queries = [
+                        f"Show me all {primary_table}",
+                        f"Count total {primary_table}",
+                        f"What are the top 5 {primary_table}?",
+                        f"Show first 10 {primary_table}",
+                        "What tables are available?"
+                    ]
+                else:
+                    # Fallback for when no schema is available
+                    example_queries = [
+                        "Show all available data",
+                        "Count total records",
+                        "What data is available?",
+                        "Display table information",
+                        "Show database structure"
+                    ]
+            except Exception:
+                # Fallback for any errors
+                example_queries = [
+                    "Show all available data",
+                    "Count total records",
+                    "What data is available?",
+                    "Display table information",
+                    "Show database structure"
+                ]
 
             click.echo("\n💡 Example Queries:")
             for i, example in enumerate(example_queries, 1):
@@ -304,6 +333,55 @@ def config_show(ctx, format: str):
             click.echo("\nFalling back to JSON:")
             import json
             click.echo(json.dumps(config.to_dict(), indent=2))
+
+
+@cli.command()
+@click.option('--host', default='localhost', help='Streamlit server host')
+@click.option('--port', default=8501, type=int, help='Streamlit server port')
+@click.option('--browser/--no-browser', default=True, help='Open browser automatically')
+@click.pass_context
+def ui(ctx, host: str, port: int, browser: bool):
+    """Launch Chat2Data Streamlit UI"""
+    try:
+        import streamlit.web.cli as stcli
+        import sys
+        from pathlib import Path
+
+        # Find the streamlit app path
+        app_path = Path(__file__).parent.parent / "frontend" / "streamlit_app.py"
+
+        if not app_path.exists():
+            click.echo(f"❌ Streamlit app not found at {app_path}")
+            return
+
+        click.echo("🚀 Launching Chat2Data UI...")
+        click.echo(f"   Host: {host}")
+        click.echo(f"   Port: {port}")
+        click.echo(f"   Browser: {'Yes' if browser else 'No'}")
+
+        # Prepare streamlit arguments
+        args = [
+            "streamlit",
+            "run",
+            str(app_path),
+            f"--server.address={host}",
+            f"--server.port={port}",
+        ]
+
+        if not browser:
+            args.append("--server.headless=true")
+
+        # Update sys.argv for streamlit
+        sys.argv = args
+
+        # Run streamlit
+        stcli.main()
+
+    except ImportError:
+        click.echo("❌ Streamlit not installed. Install with: pip install streamlit")
+        click.echo("Or install all frontend dependencies: pip install chat2data[frontend]")
+    except Exception as e:
+        click.echo(f"❌ Error launching UI: {e}")
 
 
 if __name__ == '__main__':

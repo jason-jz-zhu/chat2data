@@ -43,9 +43,40 @@ pip install -e .
 python example.py
 ```
 
+## 🌟 NEW: Interactive Web UI
+
+Launch the Chat2Data web interface with a single command:
+
+```bash
+# Launch the Streamlit UI
+python -m chat2data.cli.main ui
+
+# Or with custom options
+python -m chat2data.cli.main ui --host 0.0.0.0 --port 8080 --no-browser
+```
+
+The UI provides:
+- 💬 **Chat Interface** - Natural language query input with chat history
+- 📊 **Schema Explorer** - Browse database tables and columns
+- 📈 **Data Visualization** - Automatic charts and graphs
+- ⚙️ **Settings** - Configure providers and connections
+- 💾 **Export Options** - Download results as CSV, JSON, or SQL
+
 ## 📖 Step-by-Step Usage Guide
 
-### Step 1: Basic Programmatic Usage
+### Step 1: Launch the Web UI (Easiest Way)
+
+```bash
+# Install with UI dependencies
+pip install -e .
+
+# Launch the UI
+python -m chat2data.cli.main ui
+```
+
+Your browser will open automatically at http://localhost:8501
+
+### Step 2: Basic Programmatic Usage
 
 Create a file `my_app.py`:
 
@@ -85,7 +116,7 @@ async def main():
 asyncio.run(main())
 ```
 
-### Step 2: CLI Usage
+### Step 3: CLI Usage
 
 ```bash
 # Check system status
@@ -99,9 +130,12 @@ python -m chat2data.cli.main demo --query "Show all products"
 
 # Interactive mode
 python -m chat2data.cli.main demo --interactive
+
+# Launch the web UI
+python -m chat2data.cli.main ui
 ```
 
-### Step 3: Real-World Examples
+### Step 4: Real-World Examples
 
 #### E-Commerce Analytics
 ```python

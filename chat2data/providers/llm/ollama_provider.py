@@ -1,8 +1,10 @@
 """Ollama LLM provider for Chat2Data"""
 
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from ...core.base import LLMProvider
+from ...config.central_config import get_config
+from ...prompts import get_prompt_manager
 
 logger = logging.getLogger(__name__)
 
@@ -10,41 +12,42 @@ logger = logging.getLogger(__name__)
 class OllamaLLMProvider(LLMProvider):
     """Ollama LLM provider using PydanticAI"""
 
-    def __init__(self, model_name: str = 'llama3:latest', base_url: str = 'http://localhost:11434'):
-        """Initialize Ollama provider"""
-        self.model_name = model_name
-        self.base_url = base_url
+    def __init__(self, model_name: Optional[str] = None, base_url: Optional[str] = None):
+        """Initialize Ollama provider with central configuration defaults"""
+        config = get_config()
+        self.model_name = model_name or config.llm.model_name
+        self.base_url = base_url or config.llm.base_url
         self._agent = None
-        self._model = None
+        self.prompt_manager = get_prompt_manager()  # Initialize centralized prompt manager
+
+        logger.info(f"Initialized Ollama provider with model: {self.model_name}, base_url: {self.base_url}")
 
     def _init_agent(self):
         """Lazy initialization of PydanticAI agent"""
         if self._agent is None:
             try:
+                import os
                 from pydantic_ai import Agent
-                from pydantic_ai.models.ollama import OllamaModel
 
-                self._model = OllamaModel(
-                    model_name=self.model_name,
-                    base_url=self.base_url
+                # Set environment variables for OpenAI-compatible Ollama
+                os.environ['OPENAI_BASE_URL'] = f"{self.base_url}/v1"
+                os.environ['OPENAI_API_KEY'] = "ollama"  # Required but not used
+
+                # Remove :latest suffix if present for model name
+                model_name = self.model_name.replace(':latest', '') if self.model_name.endswith(':latest') else self.model_name
+
+                # Get system prompt from PromptManager
+                system_prompt = self.prompt_manager.get_prompt(
+                    prompt_type='sql_generation.base',
+                    provider='ollama'
                 )
 
                 self._agent = Agent(
-                    self._model,
-                    system_prompt="""You are an expert SQL query generator. Your task is to convert natural language questions into valid SQL queries.
-
-Rules:
-1. Generate only SELECT queries (no INSERT, UPDATE, DELETE, DROP, etc.)
-2. Use proper SQL syntax
-3. Be precise and accurate based on the provided schema
-4. If the query is ambiguous, make reasonable assumptions
-5. Always use table and column names exactly as provided in the schema
-6. Return ONLY the SQL query, no explanations or markdown
-
-When given a schema context, use it to understand the database structure and relationships."""
+                    f'openai:{model_name}',
+                    system_prompt=system_prompt
                 )
             except ImportError:
-                logger.error("PydanticAI not available. Install with: pip install pydantic-ai[ollama]")
+                logger.error("PydanticAI not available. Install with: pip install pydantic-ai")
                 raise
 
     async def generate_sql(self, query: str, schema_context: List[Dict[str, Any]]) -> str:
@@ -69,7 +72,7 @@ Generate a SQL query to answer this question. Return only the SQL query."""
             result = await self._agent.run(prompt)
 
             # Extract SQL from response
-            sql = self._extract_sql(result.data)
+            sql = self._extract_sql(result.output)
 
             logger.info(f"Generated SQL: {sql}")
             return sql
@@ -86,21 +89,73 @@ Generate a SQL query to answer this question. Return only the SQL query."""
         try:
             import json
 
-            prompt = f"""Based on this query: "{query}"
+            row_count = len(data)
+            sample_size = min(5, row_count)
 
-And these results (showing first 5 rows):
-{json.dumps(data[:5], indent=2)}
+            # Create sample description
+            if row_count > 0:
+                sample_description = f"""
+Data preview (showing {sample_size} of {row_count} total records):
+{json.dumps(data[:sample_size], indent=2)}"""
+                if row_count > sample_size:
+                    sample_description += f"\n... and {row_count - sample_size} more records not shown in preview"
+            else:
+                sample_description = "No data returned"
 
-Total rows: {len(data)}
+            # Use PromptManager to get summary generation prompt
+            prompt_context = {
+                'query': query,
+                'row_count': row_count,
+                'sample_description': sample_description,
+                'sample_size': sample_size
+            }
 
-Provide a brief, natural language summary of the results. Be concise and informative."""
+            prompt = self.prompt_manager.get_prompt(
+                prompt_type='summary_generation.base',
+                provider='ollama',
+                context=prompt_context
+            )
 
             result = await self._agent.run(prompt)
-            return result.data
+            summary = result.output
+
+            # Validate and correct count mismatches
+            summary = self._validate_summary(summary, row_count)
+            return summary
 
         except Exception as e:
             logger.error(f"Error generating summary: {str(e)}")
             return f"Query returned {len(data)} rows."
+
+    def _validate_summary(self, summary: str, row_count: int) -> str:
+        """Validate summary accuracy for row counts"""
+        import re
+
+        # Check for common number words that might be wrong
+        number_words = {
+            'no': 0, 'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4,
+            'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+        }
+
+        summary_lower = summary.lower()
+        for word, num in number_words.items():
+            if word in summary_lower and num != row_count:
+                # Replace incorrect count words
+                summary = re.sub(r'\b' + word + r'\b', str(row_count), summary, flags=re.IGNORECASE)
+                logger.info(f"Corrected count mismatch in summary: '{word}' -> {row_count}")
+
+        # Check for numeric mismatches
+        numeric_pattern = r'\b(\d+)\s+(record|result|row|customer|product|order|item|entry|entit)'
+        matches = re.findall(numeric_pattern, summary_lower)
+        for match in matches:
+            stated_count = int(match[0])
+            if stated_count != row_count and stated_count <= 10:  # Only fix small counts
+                old_phrase = f"{stated_count} {match[1]}"
+                new_phrase = f"{row_count} {match[1]}"
+                summary = summary.replace(old_phrase, new_phrase)
+                logger.info(f"Corrected numeric mismatch: {stated_count} -> {row_count}")
+
+        return summary
 
     def is_available(self) -> bool:
         """Check if Ollama is available"""
