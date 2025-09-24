@@ -36,6 +36,8 @@ pip-delete-this-directory.txt
 # Database files
 *.sqlite
 *.db
+# Include sample database for new users
+!data/chat2data.db
 data/sample_db.sqlite
 data/chroma_db/
 
