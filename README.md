@@ -45,6 +45,15 @@ python example.py
 
 ## 🌟 NEW: Interactive Web UI
 
+**Note**: For Web UI functionality, install frontend dependencies first:
+```bash
+# Option 1: Install with frontend dependencies (note the quotes for shell compatibility)
+pip install 'chat2data[frontend]'
+
+# Option 2: Install Streamlit separately
+pip install streamlit
+```
+
 Launch the Chat2Data web interface with a single command:
 
 ```bash
@@ -67,8 +76,11 @@ The UI provides:
 ### Step 1: Launch the Web UI (Easiest Way)
 
 ```bash
-# Install with UI dependencies
+# Install the package
 pip install -e .
+
+# Install UI dependencies (use quotes for shell compatibility)
+pip install 'chat2data[frontend]'
 
 # Launch the UI
 python -m chat2data.cli.main ui
@@ -178,7 +190,7 @@ async def explore_database():
     print("📊 Database Schema:")
     for table in schema:
         print(f"\nTable: {table.name}")
-        print(f"Columns: {', '.join([c.name for c in table.columns])}")
+        print(f"Columns: {', '.join([c['name'] for c in table.columns])}")
         print(f"Row count: {table.row_count}")
 
 asyncio.run(explore_database())

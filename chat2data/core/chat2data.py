@@ -58,7 +58,15 @@ class Chat2Data:
 
             # Generate SQL
             logger.info(f"Generating SQL for query: {natural_language_query}")
-            sql = await self.llm.generate_sql(natural_language_query, schema_context)
+            try:
+                sql = await self.llm.generate_sql(natural_language_query, schema_context)
+            except ValueError as e:
+                # Handle security blocking from LLM provider
+                return {
+                    "success": False,
+                    "query": natural_language_query,
+                    "error": str(e),
+                }
 
             # Validate SQL
             is_safe, validation_message = self.database.validate_sql(sql)
@@ -105,7 +113,10 @@ class Chat2Data:
                 "success": result.success,
                 "query": natural_language_query,
                 "sql": sql,
-                "result": result.model_dump(),
+                "data": result.data or [],  # Expose data at top level for README examples
+                "columns": result.columns or [],
+                "row_count": result.row_count,
+                "result": result.model_dump(),  # Keep full result for advanced usage
                 "summary": summary,
                 "error": result.error,
             }
