@@ -23,9 +23,11 @@ classifiers = [
 dependencies = [
     "click>=8.0.0",
     "pydantic>=2.10",
+    "pydantic-ai>=0.0.15",
     "pyyaml>=6.0",
     "requests>=2.31.0",
     "sqlparse>=0.5.3",
+    "streamlit>=1.29.0",
 ]
 
 [project.scripts]

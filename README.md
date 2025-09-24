@@ -95,14 +95,24 @@ Create a file `my_app.py`:
 ```python
 import asyncio
 from chat2data import Chat2Data
+from chat2data.providers.llm.ollama_provider import OllamaLLMProvider
 from chat2data.providers.llm.mock_provider import MockLLMProvider
 from chat2data.providers.database.sqlite_provider import SQLiteDatabaseProvider
 from chat2data.providers.vector.memory_provider import MemoryVectorStoreProvider
 
 async def main():
+    # Try to use Ollama first, fallback to mock if unavailable
+    try:
+        llm_provider = OllamaLLMProvider()
+        if not llm_provider.is_available():
+            print("⚠️  Ollama not available, using mock provider")
+            llm_provider = MockLLMProvider()
+    except Exception:
+        llm_provider = MockLLMProvider()
+
     # Initialize Chat2Data
     chat2data = Chat2Data(
-        llm_provider=MockLLMProvider(),
+        llm_provider=llm_provider,
         database_provider=SQLiteDatabaseProvider("data/chat2data.db"),
         vector_store_provider=MemoryVectorStoreProvider()
     )
@@ -152,8 +162,11 @@ python -m chat2data.cli.main ui
 #### E-Commerce Analytics
 ```python
 async def ecommerce_analytics():
+    # Use real LLM for better results
+    llm_provider = OllamaLLMProvider() if OllamaLLMProvider().is_available() else MockLLMProvider()
+
     chat2data = Chat2Data(
-        llm_provider=MockLLMProvider(),
+        llm_provider=llm_provider,
         database_provider=SQLiteDatabaseProvider("data/chat2data.db"),
         vector_store_provider=MemoryVectorStoreProvider()
     )
@@ -178,8 +191,11 @@ asyncio.run(ecommerce_analytics())
 #### Database Schema Exploration
 ```python
 async def explore_database():
+    # Use real LLM for better results
+    llm_provider = OllamaLLMProvider() if OllamaLLMProvider().is_available() else MockLLMProvider()
+
     chat2data = Chat2Data(
-        llm_provider=MockLLMProvider(),
+        llm_provider=llm_provider,
         database_provider=SQLiteDatabaseProvider("data/chat2data.db"),
         vector_store_provider=MemoryVectorStoreProvider()
     )
@@ -199,8 +215,11 @@ asyncio.run(explore_database())
 #### Error Handling
 ```python
 async def handle_errors():
+    # Use real LLM for better results
+    llm_provider = OllamaLLMProvider() if OllamaLLMProvider().is_available() else MockLLMProvider()
+
     chat2data = Chat2Data(
-        llm_provider=MockLLMProvider(),
+        llm_provider=llm_provider,
         database_provider=SQLiteDatabaseProvider("data/chat2data.db"),
         vector_store_provider=MemoryVectorStoreProvider()
     )
@@ -223,23 +242,49 @@ asyncio.run(handle_errors())
 
 ## 🔧 Configuration
 
-### Using Different Providers
+### LLM Providers
 
-#### Mock Provider (Default - No Dependencies)
-```python
-from chat2data.providers.llm.mock_provider import MockLLMProvider
-llm_provider = MockLLMProvider()
+Chat2Data now uses **real LLM providers by default** for actual SQL generation capabilities.
+
+#### Ollama Provider (RECOMMENDED - Default)
+
+**Prerequisites**: Install and run Ollama locally:
+```bash
+# Install Ollama (visit https://ollama.ai for installation instructions)
+# Then pull recommended models:
+ollama pull llama3.2:latest
+ollama pull sqlcoder:latest  # Optional: specialized SQL model
 ```
 
-#### Ollama Provider (Local LLM)
 ```python
-from chat2data.providers.llm.ollama_provider import OllamaProvider
+from chat2data.providers.llm.ollama_provider import OllamaLLMProvider
 
-# Start Ollama first: docker run -d -p 11434:11434 ollama/ollama
-llm_provider = OllamaProvider(
+# Basic Ollama provider (uses central config defaults)
+llm_provider = OllamaLLMProvider()
+
+# Or with custom settings
+llm_provider = OllamaLLMProvider(
     base_url='http://localhost:11434',
-    model='llama2'
+    model_name='llama3.2:latest'
 )
+```
+
+#### Enhanced Ollama Provider (Advanced)
+For better context handling and improved SQL generation:
+```python
+from chat2data.providers.llm.enhanced_ollama_provider import EnhancedOllamaLLMProvider
+
+llm_provider = EnhancedOllamaLLMProvider(
+    model_name='llama3.2:latest',
+    base_url='http://localhost:11434'
+)
+```
+
+#### Mock Provider (Testing/Fallback)
+```python
+from chat2data.providers.llm.mock_provider import MockLLMProvider
+# Only for testing or when real LLM is not available
+llm_provider = MockLLMProvider()
 ```
 
 #### Custom OpenAI Provider
@@ -383,9 +428,13 @@ The framework understands various query patterns:
 ### Chat2Data Class
 
 ```python
-# Initialize
+# Initialize with real LLM provider
+from chat2data.providers.llm.ollama_provider import OllamaLLMProvider
+
+llm_provider = OllamaLLMProvider() if OllamaLLMProvider().is_available() else MockLLMProvider()
+
 chat2data = Chat2Data(
-    llm_provider=MockLLMProvider(),
+    llm_provider=llm_provider,
     database_provider=SQLiteDatabaseProvider("data/chat2data.db"),
     vector_store_provider=MemoryVectorStoreProvider()
 )

@@ -23,20 +23,33 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from chat2data import Chat2Data
+from chat2data.providers.llm.ollama_provider import OllamaLLMProvider
 from chat2data.providers.llm.mock_provider import MockLLMProvider
 from chat2data.providers.database.sqlite_provider import SQLiteDatabaseProvider
 from chat2data.providers.vector.memory_provider import MemoryVectorStoreProvider
 
 
 async def basic_usage_example():
-    """Basic Chat2Data usage with mock provider"""
+    """Basic Chat2Data usage with Ollama provider (fallback to mock if unavailable)"""
     print("=" * 60)
     print("🚀 BASIC USAGE EXAMPLE")
     print("=" * 60)
 
-    # Initialize Chat2Data with built-in providers
+    # Try to use Ollama first, fallback to mock if not available
+    try:
+        llm_provider = OllamaLLMProvider()
+        if llm_provider.is_available():
+            print("✅ Using Ollama LLM provider")
+        else:
+            print("⚠️  Ollama not available, using mock provider")
+            llm_provider = MockLLMProvider()
+    except Exception as e:
+        print(f"⚠️  Failed to initialize Ollama ({e}), using mock provider")
+        llm_provider = MockLLMProvider()
+
+    # Initialize Chat2Data with selected provider
     chat2data = Chat2Data(
-        llm_provider=MockLLMProvider(),
+        llm_provider=llm_provider,
         database_provider=SQLiteDatabaseProvider("data/chat2data.db"),
         vector_store_provider=MemoryVectorStoreProvider()
     )
@@ -106,8 +119,16 @@ async def error_handling_example():
     print("⚠️  ERROR HANDLING EXAMPLE")
     print("=" * 60)
 
+    # Use the same provider selection logic as basic example
+    try:
+        llm_provider = OllamaLLMProvider()
+        if not llm_provider.is_available():
+            llm_provider = MockLLMProvider()
+    except Exception:
+        llm_provider = MockLLMProvider()
+
     chat2data = Chat2Data(
-        llm_provider=MockLLMProvider(),
+        llm_provider=llm_provider,
         database_provider=SQLiteDatabaseProvider("data/chat2data.db"),
         vector_store_provider=MemoryVectorStoreProvider()
     )
@@ -176,19 +197,19 @@ async def custom_configuration_example():
     print("Example configurations for different providers:")
     print()
 
-    # Mock provider example (already shown above)
-    print("1. Mock Provider (for testing):")
-    print("   from chat2data.providers.llm.mock_provider import MockLLMProvider")
-    print("   llm_provider = MockLLMProvider()")
+    # Ollama provider example (now the primary)
+    print("1. Ollama Provider (local LLM - RECOMMENDED):")
+    print("   from chat2data.providers.llm.ollama_provider import OllamaLLMProvider")
+    print("   llm_provider = OllamaLLMProvider(")
+    print("       base_url='http://localhost:11434',")
+    print("       model_name='llama3.2:latest'")
+    print("   )")
     print()
 
-    # Ollama provider example
-    print("2. Ollama Provider (local LLM):")
-    print("   from chat2data.providers.llm.ollama_provider import OllamaProvider")
-    print("   llm_provider = OllamaProvider(")
-    print("       base_url='http://localhost:11434',")
-    print("       model='llama2'")
-    print("   )")
+    # Mock provider example (for testing/fallback)
+    print("2. Mock Provider (for testing/fallback):")
+    print("   from chat2data.providers.llm.mock_provider import MockLLMProvider")
+    print("   llm_provider = MockLLMProvider()")
     print()
 
     # Database providers
@@ -238,7 +259,8 @@ async def main():
         print("Next steps:")
         print("• Try your own queries with: chat2data --interactive")
         print("• Connect to your own database")
-        print("• Configure a real LLM provider (Ollama, etc.)")
+        print("• Set up Ollama locally for real LLM functionality (ollama.ai)")
+        print("• Try different models: ollama pull llama3.2, ollama pull sqlcoder")
         print("• Explore the source code in chat2data/ directory")
         print("• Read the documentation in README.md")
 
