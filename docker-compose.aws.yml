@@ -1,0 +1,186 @@
+version: '3.8'
+
+services:
+  # LocalStack for AWS services simulation
+  localstack:
+    image: localstack/localstack:latest
+    container_name: chat2data-localstack
+    ports:
+      - "4566:4566"  # LocalStack gateway
+      - "4571:4571"  # LocalStack dashboard
+    environment:
+      - SERVICES=bedrock,s3,secretsmanager,sts,iam
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "./localstack-data:/tmp/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - chat2data-network
+
+  # PostgreSQL (simulating Aurora)
+  postgres:
+    image: postgres:15-alpine
+    container_name: chat2data-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=marketing
+      - POSTGRES_USER=chat2data_admin
+      - POSTGRES_PASSWORD=devpassword
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chat2data_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chat2data-network
+
+  # OpenSearch (simulating AWS OpenSearch)
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: chat2data-opensearch
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "DISABLE_INSTALL_DEMO_CONFIG=true"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - chat2data-network
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: chat2data-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chat2data-network
+
+  # Ollama for local LLM (alternative to Bedrock for testing)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: chat2data-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - chat2data-network
+
+  # Chat2Data API
+  chat2data-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chat2data-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Database configuration
+      - AURORA_HOST=postgres
+      - AURORA_PORT=5432
+      - AURORA_DATABASE=marketing
+      - AURORA_USER=chat2data_admin
+      - AURORA_PASSWORD=devpassword
+      - USE_IAM_AUTH=false
+
+      # OpenSearch configuration
+      - OPENSEARCH_ENDPOINT=opensearch:9200
+      - OPENSEARCH_INDEX_PREFIX=chat2data
+
+      # AWS configuration (using LocalStack)
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+
+      # Bedrock configuration (will use Ollama in local mode)
+      - BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+      - BEDROCK_EMBEDDINGS_MODEL=amazon.titan-embed-text-v2:0
+
+      # Application configuration
+      - PORT=8000
+      - HOST=0.0.0.0
+      - LOG_LEVEL=INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - chat2data-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: PgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: chat2data-pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@chat2data.local
+      - PGADMIN_DEFAULT_PASSWORD=admin
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - chat2data-network
+
+  # Optional: OpenSearch Dashboards
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.0
+    container_name: chat2data-opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=http://opensearch:9200
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    depends_on:
+      - opensearch
+    networks:
+      - chat2data-network
+
+volumes:
+  postgres-data:
+  opensearch-data:
+  redis-data:
+  ollama-data:
+  pgadmin-data:
+
+networks:
+  chat2data-network:
+    driver: bridge
